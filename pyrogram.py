@@ -43,13 +43,13 @@ async def task_handler():
         try:
             # Asumimos que sm.task_queue es un asyncio.Queue
             user_id, action = sm.task_queue.get_nowait()
-            await answer_to_user(user_id, action)
+            await execute_task(user_id, action)
         except asyncio.QueueEmpty:
             await asyncio.sleep(0.1)
         except Exception as e:
             print(f"Error in task_handler: {e}\n\nAction: {action}")
 
-async def answer_to_user(user_id, action) -> None:
+async def execute_task(user_id, action) -> None:
     # Helper para parse_mode
     parse_mode = enums.ParseMode.MARKDOWN
 

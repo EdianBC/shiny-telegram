@@ -1,6 +1,4 @@
-from telegram import ReplyKeyboardMarkup, KeyboardButton
 import asyncio
-
 
 states = {}
 task_queue = asyncio.Queue()

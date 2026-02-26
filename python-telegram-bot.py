@@ -11,7 +11,7 @@ load_dotenv()
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-editable_messages = {}
+saved_messages = {}
 
 async def post_init(application):
     # This function runs after the bot is initialized and before it starts polling
@@ -31,7 +31,6 @@ async def set_bot_commands(application):
 
 async def start_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id 
-    username = update.effective_user.username
     sm.set_user_state(user_id, "START")
     await sm.run_state_machine_step({"id": user_id})
     
@@ -45,72 +44,78 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def task_handler(application):
     while True:
         try:
-            user_id, action = sm.task_queue.get_nowait()
-            await answer_to_user(application, user_id, action)
+            user_id, action, params = sm.task_queue.get_nowait()
+            await execute_task(application, user_id, action, params)
         except asyncio.QueueEmpty:
             await asyncio.sleep(0.1)
         except Exception as e:
             print(f"Error in task_handler: {e}\n\nAction: {action}")
 
-async def answer_to_user(application, user_id, action) -> None:
-     
-    if action[0] == "text": # ("action type", "text to send")
-        message_sent = await application.bot.send_message(chat_id=user_id, text=action[1], parse_mode="Markdown")
-    elif action[0] == "keyboard": # ("action type", [["button1", "button2"], ["button3"], ...])
-        keyboard = ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in action[1]], resize_keyboard=True)
-        message_sent = await application.bot.send_message(chat_id=user_id, text="...", reply_markup=keyboard, parse_mode="Markdown")  
-    elif action[0] == "textkeyboard": # ("action type", "text to send", [["button1", "button2"], ["button3"], ...])
-        keyboard = ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in action[1]], resize_keyboard=True)
-        message_sent = await application.bot.send_message(chat_id=user_id, text=action[1], reply_markup=keyboard, parse_mode="Markdown")
-    elif action[0] == "textnokeyboard": # ("action type", "text to send")
-        message_sent = await application.bot.send_message(chat_id=user_id, text=action[1], reply_markup=telegram.ReplyKeyboardRemove(), parse_mode="Markdown")
-    elif action[0] == "quiz": # ("action type", {"question": "Question?", "options": ["Option 1", "Option 2"], "correct_option_id": 0, "is_anonymous": False, "open_period": 30})
-        await application.bot.send_poll(
-            chat_id=user_id,
-            question=action[1]["question"],
-            options=action[1]["options"],
-            type="quiz",
-            correct_option_id=action[1]["correct_option_id"],
-            is_anonymous=action[1]["is_anonymous"],
-            open_period=action[1].get("open_period")
-        )
-    elif action[0] == "run": # ("action type", {"id": user_id, ...})
-        data = action[1]
-        await sm.run_state_machine_step(data)
-        #asyncio.create_task(sm.run_state_machine_step(data))
-    elif action[0] == "editabletext": # ("action type", "tag for the message", "text to send")
-        tag = action[1]
-        message_sent = await application.bot.send_message(chat_id=user_id, text=action[2], parse_mode="Markdown")
-        editable_messages.setdefault(user_id, {})[tag] = message_sent.message_id
-    elif action[0] == "editabletextkeyboard": # ("action type", "tag for the message", "text to send", [["button1", "button2"], ["button3"], ...])
-        tag = action[1]
-        message_sent = await application.bot.send_message(chat_id=user_id, text=action[2], reply_markup=action[3], parse_mode="Markdown")
-        editable_messages.setdefault(user_id, {})[tag] = message_sent.message_id
-    elif action[0] == "edittext": # ("action type", "tag for the message", "new text to send")
-        tag = action[1]
-        if user_id in editable_messages and tag in editable_messages[user_id]:
-            try:
-                await application.bot.edit_message_text(chat_id=user_id, message_id=editable_messages[user_id][tag], text=action[2], parse_mode="Markdown")
-            except telegram.error.TelegramError as e:
-                print(f"Failed to edit message for user {user_id}: {e}")
-        else:
-            message_sent = await application.bot.send_message(chat_id=user_id, text=action[2], parse_mode="Markdown")
-            editable_messages.setdefault(user_id, {})[tag] = message_sent.message_id
-    elif action[0] == "edittextkeyboard":
-        tag = action[1]
-        keyboard = ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in action[3]], resize_keyboard=True)
-        if user_id in editable_messages and tag in editable_messages[user_id]:
-            try:
-                await application.bot.edit_message_text(chat_id=user_id, message_id=editable_messages[user_id][tag], text=action[2], reply_markup=keyboard, parse_mode="Markdown")
-            except telegram.error.TelegramError as e:
-                print(f"Failed to edit message for user {user_id}: {e}")
-        else:
-            message_sent = await application.bot.send_message(chat_id=user_id, text=action[2], reply_markup=keyboard, parse_mode="Markdown")
-            editable_messages.setdefault(user_id, {})[tag] = message_sent.message_id
-    else:
-        message_sent = await application.bot.send_message(chat_id=user_id, text= f"Mmm... Thinking... Brrrr Bip Bop... System Overload... Error 404... Just kidding!")
-        print(f"Unknown action type: {action[0]}")
+async def execute_task(application, user_id, action, params) -> None:
+    if action == "message":
+        text = params.get("text", None)
+        parse_mode = params.get("parse_mode", None)
+        # entities = params.get("entities", None)
+        disable_web_page_preview = params.get("disable_web_page_preview", None)
+        disable_notification = params.get("disable_notification", None)
+        protect_content = params.get("protect_content", None)
+        reply_to_message_id = saved_messages.get(params.get("reply_to_message_id", None), None)
+        allow_sending_without_reply = params.get("allow_sending_without_reply", None)
+        reply_markup = None if not params.get(reply_markup, None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("reply_markup")], resize_keyboard=True)
+        reply_markup = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else reply_markup
+        # message_thread_id = params.get("message_thread_id", None)
 
+        message_sent = await application.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            parse_mode=parse_mode,
+            # entities=entities,
+            disable_web_page_preview=disable_web_page_preview,
+            disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_to_message_id=reply_to_message_id,
+            allow_sending_without_reply=allow_sending_without_reply,
+            reply_markup=reply_markup
+            # message_thread_id=message_thread_id
+        )
+        if params.get("save", None):
+            saved_messages[params.get("save")] = message_sent.message_id
+
+    elif action == "editmessage":
+        message_id = saved_messages.get(params.get("message_id", None), None)
+        if message_id:
+            text = params.get("text", None)
+            parse_mode = params.get("parse_mode", None)
+            # entities = params.get("entities", None)
+            disable_web_page_preview = params.get("disable_web_page_preview", None)
+            disable_notification = params.get("disable_notification", None)
+            protect_content = params.get("protect_content", None)
+            reply_markup = None if not params.get(reply_markup, None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("reply_markup")], resize_keyboard=True)
+            reply_markup = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else reply_markup
+
+            try:
+                await application.bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=message_id,
+                    text=text,
+                    parse_mode=parse_mode,
+                    # entities=entities,
+                    disable_web_page_preview=disable_web_page_preview,
+                    disable_notification=disable_notification,
+                    protect_content=protect_content,
+                    reply_markup=reply_markup
+                )
+            except telegram.error.TelegramError as e:
+                print(f"Failed to edit message for user {user_id}: {e}")
+        else:
+            print(f"Message ID not found for editing: {params.get('message_id', None)}")
+
+    elif action == "run": # ("action type", {"id": user_id, ...})
+        await sm.run_state_machine_step(params)
+        #asyncio.create_task(sm.run_state_machine_step(data))
+    
+    else:
+        print(f"Unknown action: {action} for user {user_id}")
 
 
 def main() -> None:
