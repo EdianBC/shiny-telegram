@@ -8,6 +8,98 @@ user_vault = {}
 async def add_task(user_id, task):
     await task_queue.put((user_id, task))
 
+async def send_message(user_id, text, parse_mode=None, disable_web_page_preview=None, disable_notification=None, protect_content=None, reply_to_message_id=None, allow_sending_without_reply=None, keyboard=None, inline_keyboard=None, save=None):
+    await add_task(user_id, "message", {
+        "text": text,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": disable_web_page_preview,
+        "disable_notification": disable_notification,
+        "protect_content": protect_content,
+        "reply_to_message_id": reply_to_message_id,
+        "allow_sending_without_reply": allow_sending_without_reply,
+        "keyboard": keyboard,
+        "inline_keyboard": inline_keyboard,
+        "save": save
+    })
+
+async def edit_message(user_id, message_id, text, parse_mode=None, disable_web_page_preview=None, disable_notification=None, protect_content=None, keyboard=None, inline_keyboard=None, save=None):
+    await add_task(user_id, "editmessage", {
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": disable_web_page_preview,
+        "disable_notification": disable_notification,
+        "protect_content": protect_content,
+        "keyboard": keyboard,
+        "inline_keyboard": inline_keyboard,
+        "save": save
+    })
+
+async def delete_message(user_id, message_id):
+    await add_task(user_id, "delete", {
+        "message_id": message_id
+    })
+
+async def send_photo(user_id, photo, caption=None, parse_mode=None, disable_notification=None, protect_content=None, reply_to_message_id=None, allow_sending_without_reply=None, keyboard=None, inline_keyboard=None, save=None):
+    await add_task(user_id, "photo", {
+        "photo": photo,
+        "caption": caption,
+        "parse_mode": parse_mode,
+        "disable_notification": disable_notification,
+        "protect_content": protect_content,
+        "reply_to_message_id": reply_to_message_id,
+        "allow_sending_without_reply": allow_sending_without_reply,
+        "keyboard": keyboard,
+        "inline_keyboard": inline_keyboard,
+        "save": save
+    })
+
+async def send_document(user_id, document, caption=None, parse_mode=None, disable_notification=None, protect_content=None, reply_to_message_id=None, allow_sending_without_reply=None, keyboard=None, inline_keyboard=None, save=None):
+    await add_task(user_id, "document", {
+        "document": document,
+        "caption": caption,
+        "parse_mode": parse_mode,
+        "disable_notification": disable_notification,
+        "protect_content": protect_content,
+        "reply_to_message_id": reply_to_message_id,
+        "allow_sending_without_reply": allow_sending_without_reply,
+        "keyboard": keyboard,
+        "inline_keyboard": inline_keyboard,
+        "save": save
+    })
+
+async def send_video(user_id, video, caption=None, parse_mode=None, disable_notification=None, protect_content=None, reply_to_message_id=None, allow_sending_without_reply=None, keyboard=None, inline_keyboard=None, save=None):
+    await add_task(user_id, "video", {
+        "video": video,
+        "caption": caption,
+        "parse_mode": parse_mode,
+        "disable_notification": disable_notification,
+        "protect_content": protect_content,
+        "reply_to_message_id": reply_to_message_id,
+        "allow_sending_without_reply": allow_sending_without_reply,
+        "keyboard": keyboard,
+        "inline_keyboard": inline_keyboard,
+        "save": save
+    })
+
+async def send_poll(user_id, question, options, type="regular", correct_option_id=None, is_anonymous=False, open_period=None, allow_multiple_answers=None, explanation=None, explanation_parse_mode=None, reply_to_message_id=None, allow_sending_without_reply=None, keyboard=None, inline_keyboard=None, save=None):
+    await add_task(user_id, "poll", {
+        "question": question,
+        "options": options,
+        "type": type,
+        "correct_option_id": correct_option_id,
+        "is_anonymous": is_anonymous,
+        "open_period": open_period,
+        "allow_multiple_answers": allow_multiple_answers,
+        "explanation": explanation,
+        "explanation_parse_mode": explanation_parse_mode,
+        "reply_to_message_id": reply_to_message_id,
+        "allow_sending_without_reply": allow_sending_without_reply,
+        "keyboard": keyboard,
+        "inline_keyboard": inline_keyboard,
+        "save": save
+    })
+
 async def set_user_state(user_id, state):
     user_state[user_id] = state
     

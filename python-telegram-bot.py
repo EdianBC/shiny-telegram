@@ -14,30 +14,81 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 saved_messages = {}
 
 async def post_init(application):
-    # This function runs after the bot is initialized and before it starts polling
-    # It's used to set up commands, initialize the state machine, and start the task handler
-    # If you have any setup that needs to be done before the bot starts, you can add it here
+    '''
+    This function is called after the bot is initialized. It sets the bot commands and starts the state machine. You can also start any background tasks here if needed.
+    '''
     await set_bot_commands(application)
     await sm.start_state_machine()
     asyncio.create_task(task_handler(application))
 
 
 async def set_bot_commands(application):
-    # This function sets the commands that the bot will recognize. You can add more commands to the list as needed
+    '''
+    This function sets the bot commands that appear when the user types "/" in the chat. You can add more commands here as needed.
+    '''
     commands = [
         BotCommand("start", "Inicia el bot")
     ]
     await application.bot.set_my_commands(commands)
 
 async def start_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This function handles the /start command.
+    '''
     user_id = update.effective_user.id 
     sm.set_user_state(user_id, "START")
     await sm.run_state_machine_step({"id": user_id})
     
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This function handles all text messages that are not commands. It sends the message text and user ID to the state machine to be processed.
+    '''
     text = update.message.text
     data = {"id": update.effective_user.id, "message": text}
+    await sm.run_state_machine_step(data)
+    #asyncio.create_task(sm.run_state_machine_step(data))
+
+async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This function handles all callback queries from inline keyboards. It sends the callback data and user ID to the state machine to be processed.
+    '''
+    query_data = update.callback_query.data
+    user_id = update.effective_user.id
+    data = {"id": user_id, "callback_data": query_data}
+    await sm.run_state_machine_step(data)
+    #asyncio.create_task(sm.run_state_machine_step(data))
+
+async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This function handles all photo messages. It sends the file ID of the photo and user ID to the state machine to be processed.
+    '''
+    photo_file_id = update.message.photo[-1].file_id # Get the file ID of the highest resolution photo
+    user_id = update.effective_user.id
+    caption = update.message.caption
+    data = {"id": user_id, "photo_file_id": photo_file_id, "caption": caption}
+    await sm.run_state_machine_step(data)
+    #asyncio.create_task(sm.run_state_machine_step(data))
+
+async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This function handles all document messages. It sends the file ID of the document and user ID to the state machine to be processed.
+    '''
+    document_file_id = update.message.document.file_id
+    user_id = update.effective_user.id
+    caption = update.message.caption
+    data = {"id": user_id, "document_file_id": document_file_id, "caption": caption}
+    await sm.run_state_machine_step(data)
+    #asyncio.create_task(sm.run_state_machine_step(data))
+
+async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    '''
+    This function handles all video messages. It sends the file ID of the video and user ID to the state machine to be processed.
+    '''
+    video_file_id = update.message.video.file_id
+    user_id = update.effective_user.id
+    caption = update.message.caption
+    data = {"id": user_id, "video_file_id": video_file_id, "caption": caption}
     await sm.run_state_machine_step(data)
     #asyncio.create_task(sm.run_state_machine_step(data))
 
@@ -61,9 +112,15 @@ async def execute_task(application, user_id, action, params) -> None:
         protect_content = params.get("protect_content", None)
         reply_to_message_id = saved_messages.get(params.get("reply_to_message_id", None), None)
         allow_sending_without_reply = params.get("allow_sending_without_reply", None)
-        reply_markup = None if not params.get(reply_markup, None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("reply_markup")], resize_keyboard=True)
-        reply_markup = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else reply_markup
+        keyboard = None if not params.get("keyboard", None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("keyboard")], resize_keyboard=True)
+        keyboard = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else keyboard
+        inline_keyboard = None if not params.get("inline_keyboard", None) else telegram.InlineKeyboardMarkup([[telegram.InlineKeyboardButton(text=caption, callback_data=data) for caption, data in row] for row in params.get("inline_keyboard")])
         # message_thread_id = params.get("message_thread_id", None)
+
+        if keyboard and inline_keyboard:
+            raise ValueError("Cannot use both keyboard and inline_keyboard in the same message. Please choose one or the other.")
+        else:
+            reply_markup = keyboard if keyboard else inline_keyboard
 
         message_sent = await application.bot.send_message(
             chat_id=user_id,
@@ -90,8 +147,14 @@ async def execute_task(application, user_id, action, params) -> None:
             disable_web_page_preview = params.get("disable_web_page_preview", None)
             disable_notification = params.get("disable_notification", None)
             protect_content = params.get("protect_content", None)
-            reply_markup = None if not params.get(reply_markup, None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("reply_markup")], resize_keyboard=True)
-            reply_markup = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else reply_markup
+            keyboard = None if not params.get("keyboard", None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("keyboard")], resize_keyboard=True)
+            keyboard = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else keyboard
+            inline_keyboard = None if not params.get("inline_keyboard", None) else telegram.InlineKeyboardMarkup([[telegram.InlineKeyboardButton(text=caption, callback_data=data) for caption, data in row] for row in params.get("inline_keyboard")])
+
+            if keyboard and inline_keyboard:
+                raise ValueError("Cannot use both keyboard and inline_keyboard in the same message. Please choose one or the other.")
+            else:
+                reply_markup = keyboard if keyboard else inline_keyboard
 
             try:
                 await application.bot.edit_message_text(
@@ -110,7 +173,153 @@ async def execute_task(application, user_id, action, params) -> None:
         else:
             print(f"Message ID not found for editing: {params.get('message_id', None)}")
 
-    elif action == "run": # ("action type", {"id": user_id, ...})
+    elif action == "delete": 
+        message_id = saved_messages.get(params.get("message_id", None), None)
+        if message_id:
+            try:
+                await application.bot.delete_message(chat_id=user_id, message_id=message_id)
+            except telegram.error.TelegramError as e:
+                print(f"Failed to delete message for user {user_id}: {e}")
+        else:
+            print(f"Message ID not found for deletion: {params.get('message_id', None)}")
+
+    elif action == "photo":
+        photo = params.get("photo", None)
+        caption = params.get("caption", None)
+        parse_mode = params.get("parse_mode", None)
+        disable_notification = params.get("disable_notification", None)
+        protect_content = params.get("protect_content", None)
+        reply_to_message_id = saved_messages.get(params.get("reply_to_message_id", None), None)
+        allow_sending_without_reply = params.get("allow_sending_without_reply", None)
+        keyboard = None if not params.get("keyboard", None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("keyboard")], resize_keyboard=True)
+        keyboard = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else keyboard
+        inline_keyboard = None if not params.get("inline_keyboard", None) else telegram.InlineKeyboardMarkup([[telegram.InlineKeyboardButton(text=caption, callback_data=data) for caption, data in row] for row in params.get("inline_keyboard")])
+
+        if keyboard and inline_keyboard:
+            raise ValueError("Cannot use both keyboard and inline_keyboard in the same message. Please choose one or the other.")
+        else:
+            reply_markup = keyboard if keyboard else inline_keyboard
+
+        message_sent = await application.bot.send_photo(
+            chat_id=user_id,
+            photo=photo, # May be a local file path, a URL, a file ID of an existing Telegram file or a bytes object containing the photo data.
+            caption=caption,
+            parse_mode=parse_mode,
+            disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_to_message_id=reply_to_message_id,
+            allow_sending_without_reply=allow_sending_without_reply,
+            reply_markup=reply_markup
+        )
+
+        if params.get("save", None):
+            saved_messages[params.get("save")] = message_sent.message_id
+
+    elif action == "document":
+        document = params.get("document", None)
+        caption = params.get("caption", None)
+        parse_mode = params.get("parse_mode", None)
+        disable_notification = params.get("disable_notification", None)
+        protect_content = params.get("protect_content", None)
+        reply_to_message_id = saved_messages.get(params.get("reply_to_message_id", None), None)
+        allow_sending_without_reply = params.get("allow_sending_without_reply", None)
+        keyboard = None if not params.get("keyboard", None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("keyboard")], resize_keyboard=True)
+        keyboard = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else keyboard
+        inline_keyboard = None if not params.get("inline_keyboard", None) else telegram.InlineKeyboardMarkup([[telegram.InlineKeyboardButton(text=caption, callback_data=data) for caption, data in row] for row in params.get("inline_keyboard")])
+
+        if keyboard and inline_keyboard:
+            raise ValueError("Cannot use both keyboard and inline_keyboard in the same message. Please choose one or the other.")
+        else:
+            reply_markup = keyboard if keyboard else inline_keyboard
+
+        message_sent = await application.bot.send_document(
+            chat_id=user_id,
+            document=document, # May be a local file path, a URL, a file ID of an existing Telegram file or a bytes object containing the document data.
+            caption=caption,
+            parse_mode=parse_mode,
+            disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_to_message_id=reply_to_message_id,
+            allow_sending_without_reply=allow_sending_without_reply,
+            reply_markup=reply_markup
+        )
+
+        if params.get("save", None):
+            saved_messages[params.get("save")] = message_sent.message_id
+    
+    elif action == "video":
+        video = params.get("video", None) # May be a local file path, a URL, a file ID of an existing Telegram file or a bytes object containing the video data.
+        caption = params.get("caption", None)
+        parse_mode = params.get("parse_mode", None)
+        disable_notification = params.get("disable_notification", None)
+        protect_content = params.get("protect_content", None)
+        reply_to_message_id = saved_messages.get(params.get("reply_to_message_id", None), None)
+        allow_sending_without_reply = params.get("allow_sending_without_reply", None)
+        keyboard = None if not params.get("keyboard", None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("keyboard")], resize_keyboard=True)
+        keyboard = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else keyboard
+        inline_keyboard = None if not params.get("inline_keyboard", None) else telegram.InlineKeyboardMarkup([[telegram.InlineKeyboardButton(text=caption, callback_data=data) for caption, data in row] for row in params.get("inline_keyboard")])
+
+        if keyboard and inline_keyboard:
+            raise ValueError("Cannot use both keyboard and inline_keyboard in the same message. Please choose one or the other.")
+        else:
+            reply_markup = keyboard if keyboard else inline_keyboard
+
+        message_sent = await application.bot.send_video(
+            chat_id=user_id,
+            video=video, # May be a local file path, a URL, a file ID of an existing Telegram file or a bytes object containing the video data.
+            caption=caption,
+            parse_mode=parse_mode,
+            disable_notification=disable_notification,
+            protect_content=protect_content,
+            reply_to_message_id=reply_to_message_id,
+            allow_sending_without_reply=allow_sending_without_reply,
+            reply_markup=reply_markup
+        )
+
+        if params.get("save", None):
+            saved_messages[params.get("save")] = message_sent.message_id
+
+    elif action == "poll":
+        question = params.get("question", None)
+        options = params.get("options", None)
+        type = params.get("type", None) # "regular" or "quiz"
+        correct_option_id = params.get("correct_option_id", None)
+        is_anonymous = params.get("is_anonymous", None)
+        open_period = params.get("open_period", None)
+        allow_multiple_answers = params.get("allow_multiple_answers", None)
+        explanation = params.get("explanation", None)
+        explanation_parse_mode = params.get("explanation_parse_mode", None)
+        reply_to_message_id = saved_messages.get(params.get("reply_to_message_id", None), None)
+        allow_sending_without_reply = params.get("allow_sending_without_reply", None)
+        keyboard = None if not params.get("keyboard", None) else ReplyKeyboardMarkup([[KeyboardButton(text=caption) for caption in row] for row in params.get("keyboard")], resize_keyboard=True)
+        keyboard = telegram.ReplyKeyboardRemove() if params.get("remove_keyboard", False) else keyboard
+        inline_keyboard = None if not params.get("inline_keyboard", None) else telegram.InlineKeyboardMarkup([[telegram.InlineKeyboardButton(text=caption, callback_data=data) for caption, data in row] for row in params.get("inline_keyboard")])
+
+        if keyboard and inline_keyboard:
+            raise ValueError("Cannot use both keyboard and inline_keyboard in the same message. Please choose one or the other.")
+        else:
+            reply_markup = keyboard if keyboard else inline_keyboard
+
+        message_sent = await application.bot.send_poll(
+            chat_id=user_id,
+            question=question,
+            options=options,
+            type=type,
+            correct_option_id=correct_option_id,
+            is_anonymous=is_anonymous,
+            open_period=open_period,
+            allow_multiple_answers=allow_multiple_answers,
+            explanation=explanation,
+            explanation_parse_mode=explanation_parse_mode,
+            reply_to_message_id=reply_to_message_id,
+            allow_sending_without_reply=allow_sending_without_reply,
+            reply_markup=reply_markup
+        )
+
+        if params.get("save", None):
+            saved_messages[params.get("save")] = message_sent.message_id
+
+    elif action == "run":
         await sm.run_state_machine_step(params)
         #asyncio.create_task(sm.run_state_machine_step(data))
     
@@ -122,7 +331,11 @@ def main() -> None:
     application = Application.builder().token(TOKEN).post_init(post_init).build()
     application.add_handler(CommandHandler("start", start_command_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-    
+    application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
+    application.add_handler(MessageHandler(filters.Document.ALL, document_handler))
+    application.add_handler(MessageHandler(filters.Video.ALL, video_handler))
+    application.add_handler(MessageHandler(filters.ALL & filters.UpdateType.CALLBACK_QUERY, callback_query_handler))
+
     print("El bot ha iniciado. Presiona Ctrl+C para detenerlo.")
     application.run_polling(poll_interval=0.5)
 
