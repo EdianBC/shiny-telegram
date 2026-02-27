@@ -2,8 +2,8 @@ import os
 import asyncio
 from dotenv import load_dotenv
 
-from pyrogram import Client, filters, enums, idle
-from pyrogram.types import (
+from hydrogram import Client, filters, enums, idle
+from hydrogram.types import (
     BotCommand,
     ReplyKeyboardMarkup,
     KeyboardButton,
@@ -11,18 +11,18 @@ from pyrogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton
 )
-from pyrogram.errors import RPCError
+from hydrogram.errors import RPCError
 
 import state_machine as sm
 
 load_dotenv()
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-# Pyrogram requiere API_ID y API_HASH
+# hydrogram requiere API_ID y API_HASH
 API_ID = os.getenv("API_ID") 
 API_HASH = os.getenv("API_HASH")
 
-# Inicializar cliente de Pyrogram
+# Inicializar cliente de hydrogram
 app = Client(
     "mi_bot_session",
     api_id=API_ID,
@@ -64,7 +64,7 @@ async def callback_query_handler(client, callback_query):
 
 @app.on_message(filters.photo)
 async def photo_handler(client, message):
-    photo_file_id = message.photo.file_id # Pyrogram ya extrae la de mejor calidad
+    photo_file_id = message.photo.file_id # hydrogram ya extrae la de mejor calidad
     user_id = message.from_user.id
     caption = message.caption
     data = {"id": user_id, "photo_file_id": photo_file_id, "caption": caption}
@@ -130,7 +130,7 @@ async def execute_task(user_id, action, params) -> None:
             reply_markup=reply_markup
         )
         if params.get("save", None):
-            saved_messages[params.get("save")] = message_sent.id # Pyrogram usa .id
+            saved_messages[params.get("save")] = message_sent.id # hydrogram usa .id
 
     elif action == "editmessage":
         message_id = saved_messages.get(params.get("message_id", None), None)
@@ -169,7 +169,7 @@ async def execute_task(user_id, action, params) -> None:
         message_id = saved_messages.get(params.get("message_id", None), None)
         if message_id:
             try:
-                # Pyrogram usa delete_messages (plural) y message_ids
+                # hydrogram usa delete_messages (plural) y message_ids
                 await app.delete_messages(chat_id=user_id, message_ids=message_id)
             except RPCError as e:
                 print(f"Failed to delete message for user {user_id}: {e}")
@@ -272,7 +272,7 @@ async def execute_task(user_id, action, params) -> None:
     elif action == "poll":
         question = params.get("question", None)
         options = params.get("options", None)
-        type = params.get("type", None) # enums.PollType.REGULAR or enums.PollType.QUIZ en Pyrogram
+        type = params.get("type", None) # enums.PollType.REGULAR or enums.PollType.QUIZ en hydrogram
         correct_option_id = params.get("correct_option_id", None)
         is_anonymous = params.get("is_anonymous", None)
         open_period = params.get("open_period", None)
@@ -298,7 +298,7 @@ async def execute_task(user_id, action, params) -> None:
             correct_option_id=correct_option_id,
             is_anonymous=is_anonymous,
             open_period=open_period,
-            allows_multiple_answers=allow_multiple_answers, # Nota: En Pyrogram es 'allows_' con 's'
+            allows_multiple_answers=allow_multiple_answers, # Nota: En hydrogram es 'allows_' con 's'
             explanation=explanation,
             explanation_parse_mode=explanation_parse_mode,
             reply_to_message_id=reply_to_message_id,
@@ -324,14 +324,14 @@ async def main():
     await sm.start_state_machine()
     asyncio.create_task(task_handler())
     
-    print("El bot de Pyrogram ha iniciado. Presiona Ctrl+C para detenerlo.")
+    print("El bot de hydrogram ha iniciado. Presiona Ctrl+C para detenerlo.")
     await idle()  # Mantiene el bot corriendo
     
     print("Deteniendo bot...")
     await app.stop()
 
 if __name__ == "__main__":
-    # Pyrogram maneja su propio event loop si usas app.run(), 
+    # hydrogram maneja su propio event loop si usas app.run(), 
     # pero como necesitamos iniciar tareas en background (task_handler) 
     # antes de bloquear con idle(), lo arrancamos manualmente.
     asyncio.run(main())
