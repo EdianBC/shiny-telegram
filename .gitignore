@@ -1,2 +1,5 @@
 .env
 __pycache__
+*.session
+*.session-shm
+*.session-wal

@@ -5,8 +5,8 @@ task_queue = asyncio.Queue()
 user_state = {}
 user_vault = {}
 
-async def add_task(user_id, task):
-    await task_queue.put((user_id, task))
+async def add_task(user_id, task, data={}):
+    await task_queue.put((user_id, task, data))
 
 async def send_message(user_id, text, parse_mode=None, disable_web_page_preview=None, disable_notification=None, protect_content=None, reply_to_message_id=None, allow_sending_without_reply=None, keyboard=None, inline_keyboard=None, save=None):
     await add_task(user_id, "message", {
@@ -165,7 +165,7 @@ async def run_state_machine_step(data: dict) -> list:
 
 # START
 async def start_core(data):
-    add_task(data["id"], ("text", "¡Bienvenido al bot! Escribe 'Hola' para empezar a chatear."))
+    await send_message(data["id"], "¡Hola! Bienvenido al bot. Escribe 'Hola' para empezar.")
 
 async def start_transition(data):
     return "MAIN"
@@ -178,7 +178,8 @@ async def main_transition(data):
     message = data.get("message")
 
     if message == "Hola":
-        add_task(data["id"], ("text", "Hola, ¿cómo estás?"))
+        await send_message(data["id"], "¡Hola! ¿Cómo estás?")
+        return "MAIN"
     else:
-        await add_task(data["id"], ("text", "No entiendo lo que quieres decir."))
+        await send_message(data["id"], "No entiendo lo que quieres decir. Escribe 'Hola' para empezar.")
         return "MAIN"
